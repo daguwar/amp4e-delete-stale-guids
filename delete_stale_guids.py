@@ -8,6 +8,7 @@ from smtplib import SMTPException
 import argparse
 import configparser
 import email
+import os
 import requests
 import smtplib
 import sys
@@ -167,8 +168,11 @@ def main():
         for computer in computers_to_delete:
             delete_guid(amp_session, computer.guid, computer.hostname, computers_url)
 
-    send_report(recipient, sender_email, smtp_server)        
+    send_report(recipient, sender_email, smtp_server) 
 
+    # Cleanup
+    os.remove('stale_guids.csv')
+    os.remove('deletion-log.txt')
 
 if __name__ == "__main__":
     main()
