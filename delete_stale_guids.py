@@ -1,9 +1,17 @@
-from datetime import datetime
 from collections import namedtuple
+from datetime import datetime
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from smtplib import SMTPException
 import argparse
 import configparser
+import email
 import requests
+import smtplib
 import sys
+
 
 def calculate_time_delta(timestamp):
     '''Calculate how long it has been since the GUID was last seen
@@ -40,16 +48,6 @@ def process_response_json(json, age_threshold):
             computers_to_delete.add(computer)
     return computers_to_delete
 
-def confirm_delete():
-    '''Ask the user if they want to delete the GUIDs
-    '''
-    while True:
-        reply = str(input('Do you want to delete inactive GUIDs?'+' (y/n): ')).lower().strip()
-        if reply[:1] == 'y':
-            return True
-        if reply[:1] == 'n':
-            return False
-
 def delete_guid(session, guid, hostname, computers_url):
     '''Delete the supplied GUID
     '''
@@ -57,10 +55,8 @@ def delete_guid(session, guid, hostname, computers_url):
     response = session.delete(url)
     response_json = response.json()
     now = datetime.now()
-    day_string = now.strftime("%Y-%m-%d")
     daytime_string = now.strftime("%Y-%m-%d %H:%M:%S")
-    # Log file rotate daily
-    with open('log_'+ day_string + '.txt', 'a+', encoding='utf-8') as file_output:
+    with open('deletion-log.txt', 'a+', encoding='utf-8') as file_output:
         if response.status_code == 200 and response_json['data']['deleted']:
             file_output.write(daytime_string + ' - Succesfully deleted: {}'.format(hostname) + '\n')
         else:
@@ -73,6 +69,41 @@ def get(session, url):
     response_json = response.json()
     return response_json
 
+def send_report(recipient, sender_email, smtp_server):
+    '''Send email with the created log files as attachments
+    '''
+    subject = 'Delete stale GUIDs report'
+    body = 'Log files from script "delete_stale_guids.py"'
+    # Create a multipart message and set headers
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient
+    message["Subject"] = subject
+    #message["Bcc"] = receiver_email  # Recommended for mass emails
+
+    # Add body to email
+    message.attach(MIMEText(body, "plain"))
+
+    files = ['stale_guids.csv', 'deletion-log.txt']
+
+    for a_file in files:
+        attachment = open(a_file, 'rb')
+        part = MIMEBase('application','octet-stream')
+        part.set_payload(attachment.read())
+        part.add_header('Content-Disposition',
+                    'attachment',
+                    filename=a_file)
+        encoders.encode_base64(part)
+        message.attach(part)
+
+    #sends email
+    try:
+        smtpObj = smtplib.SMTP(smtp_server)
+        smtpObj.sendmail(sender_email, recipient, message.as_string())
+
+    except SMTPException:
+        pass
+
 def main():
     '''The main logic of the script
     '''
@@ -81,7 +112,7 @@ def main():
     ## parser
 
     # Specify the config file
-    config_file = 'api.test'
+    config_file = 'delete_stale_guids.test'
 
     # Reading the config file to get settings
     config = configparser.RawConfigParser()
@@ -90,6 +121,9 @@ def main():
     api_key = config.get('AMPE', 'api_key')
     age_threshold = int(config.get('AMPE', 'age_threshold'))
     cloud = config.get('AMPE', 'cloud')
+    recipient = config.get('AMPE', 'recipient')
+    sender_email = config.get('AMPE', 'sender_email')
+    smtp_server = config.get('AMPE', 'smtp_server')
 
     # Instantiate requestions session object
     amp_session = requests.session()
@@ -123,9 +157,7 @@ def main():
         computers_to_delete = computers_to_delete.union(next_batch)
 
     if computers_to_delete:
-        now = datetime.now()
-        day_string = now.strftime("%Y-%m-%d")
-        with open('stale_guids' + day_string + '.csv', 'w', encoding='utf-8') as file_output:
+        with open('stale_guids.csv', 'w', encoding='utf-8') as file_output:
             file_output.write('Age in days,GUID,Hostname\n')
             for computer in computers_to_delete:
                 file_output.write('{},{},{}\n'.format(computer.age,
@@ -134,7 +166,9 @@ def main():
         # Delete GUIDs
         for computer in computers_to_delete:
             delete_guid(amp_session, computer.guid, computer.hostname, computers_url)
-        
+
+    send_report(recipient, sender_email, smtp_server)        
+
 
 if __name__ == "__main__":
     main()

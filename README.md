@@ -1,4 +1,3 @@
-[![Gitter chat](https://img.shields.io/badge/gitter-join%20chat-brightgreen.svg)](https://gitter.im/CiscoSecurity/AMP-for-Endpoints "Gitter chat")
 
 ### AMP for Endpoints Delete Stale GUIDs:
 
@@ -8,7 +7,7 @@ Both
 
 For large environments (50k+ GUIDs) this script may take over 30 minutes to complete.
 
-### Before using you must update ```api.cfg```:
+### Before using you must update ```delete_stale_guids.cfg```:
 Authentication parameters:
 - client_id 
 - api_key
@@ -18,6 +17,11 @@ Delete all GUIDs older than this value:
 
 Choose cloud location. Set to eu for European Union, apjc for Asia Pacific, Japan, and Greater China or leave empty for North America:
 - cloud
+
+Add email configuration for sending of log files.
+- recipient
+- sender_email
+- smtp_server
 
 ### Usage:
 ```
