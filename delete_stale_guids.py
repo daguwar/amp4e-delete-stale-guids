@@ -112,7 +112,7 @@ def main():
     ## parser
 
     # Specify the config file
-    config_file = 'delete_stale_guids.test'
+    config_file = 'delete_stale_guids.cfg'
 
     # Reading the config file to get settings
     config = configparser.RawConfigParser()
