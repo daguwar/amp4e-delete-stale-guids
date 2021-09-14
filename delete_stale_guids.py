@@ -134,8 +134,6 @@ def main():
     computers_to_delete = set()
 
     # URL to query AMP
-    cloud = config.get('AMPE', 'cloud')
-
     if cloud == '':
         computers_url = 'https://api.amp.cisco.com/v1/computers/'
     else:
